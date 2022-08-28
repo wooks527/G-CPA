@@ -1,0 +1,8 @@
+matplotlib
+pandas
+pytorch-lightning
+flake8
+black
+pre-commit
+einops
+wandb
