@@ -5,11 +5,16 @@
 """
 
 from typing import Callable, cast, Dict, List, Optional, Tuple, Union, Any
+from torch.nn import functional as F
+from torchvision import transforms
 from torchvision.models import resnet50, vit_b_16, swin_b
 from torchvision.models.vision_transformer import ViT_B_16_Weights
 from torchvision.models.swin_transformer import Swin_B_Weights
 from torchvision.datasets import ImageFolder
 from models.CoAtNet import CoAtNet
+from models.YOLOv7 import YOLOv7Backbone
+from utils.transforms import RandomMixup, RandomCutmix
+from utils.scheduler import CosineAnnealingWithWarmUpLR
 
 import pytorch_lightning as pl
 import torch.nn as nn
@@ -26,12 +31,16 @@ class Classifier(pl.LightningModule):
         self,
         model_name: str = "resnet50",
         num_classes: int = 10,
+        epoch: int = 30,
+        warmup_epochs: int = 20,
     ) -> None:
         """Initialize instance.
 
         Args:
             model_name: classification model name
             num_classes: the number of classes
+            epoch: the number of epochs
+            warmup_epochs: the number of epochs for warm-up
         """
         super().__init__()
         if model_name == "resnet50":
@@ -81,13 +90,25 @@ class Classifier(pl.LightningModule):
                 block_types=block_types,
                 num_classes=num_classes,
             )
+        elif "yolov7_backbone" == model_name:
+            model = YOLOv7Backbone(num_classes=num_classes)
         else:
             assert False, "Not supported model"
 
+        self.transforms = transforms.RandomChoice(
+            [
+                RandomMixup(num_classes=10, p=1.0, alpha=0.8),
+                RandomCutmix(num_classes=10, p=1.0, alpha=1.0),
+            ]
+        )
         self.model_name = model_name
         self.cls_nums = num_classes
+        self.epoch = epoch
+        self.warump_epochs = warmup_epochs
         self.model = model
-        self.criterion = nn.CrossEntropyLoss()
+        # self.criterion = nn.CrossEntropyLoss()
+        # self.criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+        self.criterion = nn.BCELoss()
         self.train_acc = torchmetrics.Accuracy()
         self.valid_acc = torchmetrics.Accuracy()
         self.pred_acc = torchmetrics.Accuracy()
@@ -103,7 +124,7 @@ class Classifier(pl.LightningModule):
         Returns:
             dictionary contains loss, preds, and lables
         """
-        inputs, labels = batch
+        inputs, labels = self.transforms(*batch)
         outputs = self.model(inputs)
         _, preds = torch.max(outputs, 1)
         loss = self.criterion(outputs, labels)
@@ -137,6 +158,9 @@ class Classifier(pl.LightningModule):
             dictionary contains loss, preds, and lables
         """
         inputs, labels = batch
+        device = labels.device
+        labels = F.one_hot(labels, num_classes=self.cls_nums)
+        labels = labels.type(torch.FloatTensor).to(device)
         outputs = self.model(inputs)
         _, preds = torch.max(outputs, 1)
         loss = self.criterion(outputs, labels)
@@ -190,15 +214,33 @@ class Classifier(pl.LightningModule):
         pred_acc = self.pred_acc(preds, labels)
         print(f"Prediction Accuracy: {pred_acc:.4f}")
 
-    def configure_optimizers(self) -> optim.Optimizer:
+    def configure_optimizers(self):
         """Choose what optimizers and learning-rate schedulers
            to use in your optimization.
 
         Returns:
             optimizer: optimizer to update the model.
         """
-        optimizer = optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9)
-        return optimizer
+        # optimizer = optim.SGD(
+        #   self.model.parameters(),
+        #   lr=0.001,
+        #   momentum=0.9,
+        # )
+        optimizer = optim.AdamW(
+            self.model.parameters(),
+            lr=0.001,
+            weight_decay=0.05,
+        )
+        # scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        #     optimizer,
+        #     T_max=self.epoch,
+        # )
+        scheduler = CosineAnnealingWithWarmUpLR(
+            optimizer,
+            T_max=self.epoch,
+            warmup_epochs=self.warump_epochs,
+        )
+        return [optimizer], [scheduler]
 
 
 class CustomImageDataset(ImageFolder):
