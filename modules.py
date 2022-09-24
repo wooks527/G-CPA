@@ -5,15 +5,12 @@
 """
 
 from typing import Callable, cast, Dict, List, Optional, Tuple, Union, Any
-from torch.nn import functional as F
-from torchvision import transforms
 from torchvision.models import resnet50, vit_b_16, swin_b
 from torchvision.models.vision_transformer import ViT_B_16_Weights
 from torchvision.models.swin_transformer import Swin_B_Weights
 from torchvision.datasets import ImageFolder
 from models.CoAtNet import CoAtNet
 from models.YOLOv7 import YOLOv7Backbone
-from utils.transforms import RandomMixup, RandomCutmix
 from utils.scheduler import CosineAnnealingWithWarmUpLR
 
 import pytorch_lightning as pl
@@ -95,20 +92,13 @@ class Classifier(pl.LightningModule):
         else:
             assert False, "Not supported model"
 
-        self.transforms = transforms.RandomChoice(
-            [
-                RandomMixup(num_classes=10, p=1.0, alpha=0.8),
-                RandomCutmix(num_classes=10, p=1.0, alpha=1.0),
-            ]
-        )
         self.model_name = model_name
         self.cls_nums = num_classes
         self.epoch = epoch
         self.warump_epochs = warmup_epochs
         self.model = model
-        # self.criterion = nn.CrossEntropyLoss()
+        self.criterion = nn.CrossEntropyLoss()
         # self.criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-        self.criterion = nn.BCELoss()
         self.train_acc = torchmetrics.Accuracy()
         self.valid_acc = torchmetrics.Accuracy()
         self.pred_acc = torchmetrics.Accuracy()
@@ -124,7 +114,7 @@ class Classifier(pl.LightningModule):
         Returns:
             dictionary contains loss, preds, and lables
         """
-        inputs, labels = self.transforms(*batch)
+        inputs, labels = batch
         outputs = self.model(inputs)
         _, preds = torch.max(outputs, 1)
         loss = self.criterion(outputs, labels)
@@ -158,9 +148,6 @@ class Classifier(pl.LightningModule):
             dictionary contains loss, preds, and lables
         """
         inputs, labels = batch
-        device = labels.device
-        labels = F.one_hot(labels, num_classes=self.cls_nums)
-        labels = labels.type(torch.FloatTensor).to(device)
         outputs = self.model(inputs)
         _, preds = torch.max(outputs, 1)
         loss = self.criterion(outputs, labels)

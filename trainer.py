@@ -33,6 +33,12 @@ def parse_args() -> argparse.Namespace:
         help="model name",
     )
     parser.add_argument(
+        "--num_classes",
+        type=int,
+        default=10,
+        help="the number of classes",
+    )
+    parser.add_argument(
         "--batch",
         type=int,
         default=128,
@@ -65,6 +71,7 @@ if __name__ == "__main__":
 
     train_transforms = transforms.Compose(
         [
+            transforms.RandAugment(),
             # transforms.RandomResizedCrop(224),
             transforms.RandomResizedCrop(640),
             transforms.RandomHorizontalFlip(),
@@ -89,8 +96,8 @@ if __name__ == "__main__":
         transform=train_transforms,
     )
     val_dataset = datasets.ImageFolder(
-        f"{args.data}/val_nui",
-        # f"{args.data}/val",
+        # f"{args.data}/val_nui",
+        f"{args.data}/val",
         transform=val_transforms,
     )
     train_loader = DataLoader(
@@ -105,7 +112,12 @@ if __name__ == "__main__":
         num_workers=32,
     )
 
-    model = Classifier(model_name=args.model, num_classes=10, epoch=args.epoch)
+    model = Classifier(
+        model_name=args.model,
+        num_classes=args.num_classes,
+        epoch=args.epoch,
+        warmup_epochs=args.warmup_epochs,
+    )
     tb_logger = TensorBoardLogger(save_dir=f"logs/{args.exp_name}")
     wandb_logger = WandbLogger(
         save_dir=f"logs/{args.exp_name}",
@@ -122,7 +134,7 @@ if __name__ == "__main__":
     lr_callback = LearningRateMonitor(logging_interval="epoch")
     trainer = pl.Trainer(
         max_epochs=args.epoch,
-        devices=4,
+        devices=2,
         strategy="ddp",
         accelerator="gpu",
         logger=[tb_logger, wandb_logger],
