@@ -7,7 +7,7 @@
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from pytorch_lightning.loggers import TensorBoardLogger
-from modules import Classifier, CustomImageDataset
+from modules import Classifier, ImageWithLabelDataset, ImageDataset
 
 import pytorch_lightning as pl
 import pandas as pd
@@ -72,10 +72,17 @@ if __name__ == "__main__":
         )
     except Exception as e:
         print(e)
-        test_dataset = CustomImageDataset(
-            f"{args.data}",
-            transform=test_transforms,
-        )
+        try:
+            test_dataset = ImageWithLabelDataset(
+                f"{args.data}",
+                transform=test_transforms,
+            )
+        except Exception as e:
+            print(e)
+            test_dataset = ImageDataset(
+                f"{args.data}",
+                transform=test_transforms,
+            )
 
     test_loader = DataLoader(
         test_dataset,
@@ -93,11 +100,17 @@ if __name__ == "__main__":
 
     print(f"\n[{args.test_data}] Start Prediction:")
     results = trainer.predict(model, test_loader)
-    classes = test_dataset.classes
+    if hasattr(test_dataset, "classes"):
+        imgs = [os.path.basename(img) for img, _ in test_dataset.imgs]
+        classes = test_dataset.classes
+    else:
+        imgs = [os.path.basename(img) for img in test_dataset.imgs]
+        sample_df = pd.read_csv(f"csvs/{args.test_data}.csv")
+        classes = sorted(set(sample_df["pred"]))
+
     idx_to_cls = {idx: cls_name for idx, cls_name in enumerate(classes)}
     preds_list = torch.cat([result["preds"] for result in results]).tolist()
     preds_list = [idx_to_cls[pred] for pred in preds_list]
-    imgs = [os.path.basename(img) for img, _ in test_dataset.imgs]
     results_dict = {img: pred for img, pred in zip(imgs, preds_list)}
 
     df_preds = pd.read_csv(f"csvs/{args.test_data}.csv")

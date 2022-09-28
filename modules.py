@@ -5,6 +5,7 @@
 """
 
 from typing import Callable, cast, Dict, List, Optional, Tuple, Union, Any
+from torch.utils.data import Dataset
 from torchvision.models import resnet50, vit_b_16, swin_b, swin_v2_b
 from torchvision.models.vision_transformer import ViT_B_16_Weights
 from torchvision.models.swin_transformer import (
@@ -15,6 +16,8 @@ from torchvision.datasets import ImageFolder
 from models.CoAtNet import CoAtNet
 from models.YOLOv7 import YOLOv7Backbone
 from utils.scheduler import CosineAnnealingWithWarmUpLR
+from glob import glob
+from PIL import Image
 
 import pytorch_lightning as pl
 import torch.nn as nn
@@ -249,7 +252,7 @@ class Classifier(pl.LightningModule):
         return [optimizer], [scheduler]
 
 
-class CustomImageDataset(ImageFolder):
+class ImageWithLabelDataset(ImageFolder):
     """Custom image dataset to handle empty floders."""
 
     @staticmethod
@@ -398,3 +401,19 @@ def make_dataset(
     #     raise FileNotFoundError(msg)
 
     return instances
+
+
+class ImageDataset(Dataset):
+    def __init__(self, img_dir, transform=None, target_transform=None):
+        self.imgs = glob(f"{img_dir}/*")
+        self.transform = transform
+        self.target_transform = target_transform
+
+    def __len__(self):
+        return len(self.imgs)
+
+    def __getitem__(self, idx):
+        image = Image.open(self.imgs[idx])
+        if self.transform:
+            image = self.transform(image)
+        return image, 0
