@@ -12,6 +12,7 @@ repos:
     rev: 22.8.0
     hooks:
     -   id: black
+        exclude: ^models/swinv2/
 -   repo: https://gitlab.com/pycqa/flake8
     rev: 3.9.2
     hooks:

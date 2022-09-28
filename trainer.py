@@ -9,6 +9,7 @@ from torchvision import datasets, transforms
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from modules import Classifier
+from utils.general import init_seeds
 
 import pytorch_lightning as pl
 import argparse
@@ -80,18 +81,25 @@ def parse_args() -> argparse.Namespace:
         default="resnet50",
         help="experiment name",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="random seed",
+    )
 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
+    init_seeds(seed=args.seed)
 
     train_transforms = transforms.Compose(
         [
             transforms.RandAugment(),
-            # transforms.RandomResizedCrop(224),
-            transforms.RandomResizedCrop(640),
+            transforms.RandomResizedCrop(224),
+            # transforms.RandomResizedCrop(640),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
@@ -99,10 +107,10 @@ if __name__ == "__main__":
     )
     val_transforms = transforms.Compose(
         [
-            # transforms.Resize(256),
-            # transforms.CenterCrop(224),
-            transforms.Resize(672),
-            transforms.CenterCrop(640),
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            # transforms.Resize(672),
+            # transforms.CenterCrop(640),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ]
@@ -156,7 +164,8 @@ if __name__ == "__main__":
     lr_callback = LearningRateMonitor(logging_interval="epoch")
     trainer = pl.Trainer(
         max_epochs=args.epoch,
-        devices=2,
+        # devices=2,
+        devices=[0, 1, 3, 4, 5, 6, 7],
         strategy="ddp",
         accelerator="gpu",
         logger=[tb_logger, wandb_logger],

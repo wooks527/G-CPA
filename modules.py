@@ -5,9 +5,12 @@
 """
 
 from typing import Callable, cast, Dict, List, Optional, Tuple, Union, Any
-from torchvision.models import resnet50, vit_b_16, swin_b
+from torchvision.models import resnet50, vit_b_16, swin_b, swin_v2_b
 from torchvision.models.vision_transformer import ViT_B_16_Weights
-from torchvision.models.swin_transformer import Swin_B_Weights
+from torchvision.models.swin_transformer import (
+    Swin_B_Weights,
+    Swin_V2_B_Weights,
+)
 from torchvision.datasets import ImageFolder
 from models.CoAtNet import CoAtNet
 from models.YOLOv7 import YOLOv7Backbone
@@ -59,6 +62,12 @@ class Classifier(pl.LightningModule):
         elif model_name == "swin_b":
             model = swin_b(
                 weights=Swin_B_Weights.IMAGENET1K_V1,
+                # weights=None, # TO-DO: Parameterize weights param
+                num_classes=num_classes,
+            )
+        elif model_name == "swin_v2_b":
+            model = swin_v2_b(
+                weights=Swin_V2_B_Weights.IMAGENET1K_V1,
                 # weights=None, # TO-DO: Parameterize weights param
                 num_classes=num_classes,
             )
