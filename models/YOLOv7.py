@@ -4,6 +4,8 @@
 - Contact: wooks527@gmail.com
 """
 from torch import nn
+from collections import OrderedDict
+
 import torch
 
 
@@ -94,7 +96,7 @@ class Shortcut(nn.Module):
 class YOLOv7Backbone(nn.Module):
     """YOLOv7 Backbone"""
 
-    def __init__(self, num_classes=10):
+    def __init__(self, num_classes=10, weights=None):
         super(YOLOv7Backbone, self).__init__()
         self.model = nn.Sequential(
             ReOrg(),  # P0
@@ -210,7 +212,21 @@ class YOLOv7Backbone(nn.Module):
             Conv(2560, 1280, k=1, s=1),
             Shortcut(),
         )
-        self.pool = nn.AvgPool2d(10, 1)
+        self.pool = nn.AvgPool2d(num_classes, 1)
+
+        if weights is not None:
+            ckpt = torch.load(weights)
+            state_dict = OrderedDict()
+            for key, value in ckpt["state_dict"].items():
+                if "fc" in key:
+                    continue
+
+                new_key = ".".join(key.split(".")[1:])
+                state_dict[new_key] = value
+
+            matched = self.load_state_dict(state_dict)
+            print(matched)
+
         self.fc = nn.Linear(1280, num_classes, bias=False)
 
     def forward(self, x):

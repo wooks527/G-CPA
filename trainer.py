@@ -53,8 +53,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--warmup_epochs",
         type=int,
-        default=20,
+        default=0,
         help="warm-up epochs",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=0.001,
+        help="learning rate",
+    )
+    parser.add_argument(
+        "--weight_decay",
+        type=float,
+        default=0.05,
+        help="weight decay",
+    )
+    parser.add_argument(
+        "--weights",
+        type=str,
+        default=None,
+        help="weight of model",
     )
     parser.add_argument(
         "--exp_name",
@@ -96,8 +114,8 @@ if __name__ == "__main__":
         transform=train_transforms,
     )
     val_dataset = datasets.ImageFolder(
-        # f"{args.data}/val_nui",
-        f"{args.data}/val",
+        f"{args.data}/val_nui",
+        # f"{args.data}/val",
         transform=val_transforms,
     )
     train_loader = DataLoader(
@@ -117,7 +135,11 @@ if __name__ == "__main__":
         num_classes=args.num_classes,
         epoch=args.epoch,
         warmup_epochs=args.warmup_epochs,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        weights=args.weights,
     )
+
     tb_logger = TensorBoardLogger(save_dir=f"logs/{args.exp_name}")
     wandb_logger = WandbLogger(
         save_dir=f"logs/{args.exp_name}",

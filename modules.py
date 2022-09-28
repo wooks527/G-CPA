@@ -30,6 +30,9 @@ class Classifier(pl.LightningModule):
         num_classes: int = 10,
         epoch: int = 30,
         warmup_epochs: int = 20,
+        lr: float = 1e-3,
+        weight_decay: float = 0.05,
+        weights: str = None,
     ) -> None:
         """Initialize instance.
 
@@ -38,6 +41,9 @@ class Classifier(pl.LightningModule):
             num_classes: the number of classes
             epoch: the number of epochs
             warmup_epochs: the number of epochs for warm-up
+            lr: learning rate
+            weight_decay: weight decay
+            weights: weight of model
         """
         super().__init__()
         if model_name == "resnet50":
@@ -88,7 +94,7 @@ class Classifier(pl.LightningModule):
                 num_classes=num_classes,
             )
         elif "yolov7_backbone" == model_name:
-            model = YOLOv7Backbone(num_classes=num_classes)
+            model = YOLOv7Backbone(num_classes=num_classes, weights=weights)
         else:
             assert False, "Not supported model"
 
@@ -96,6 +102,8 @@ class Classifier(pl.LightningModule):
         self.cls_nums = num_classes
         self.epoch = epoch
         self.warump_epochs = warmup_epochs
+        self.lr = lr
+        self.weight_decay = weight_decay
         self.model = model
         self.criterion = nn.CrossEntropyLoss()
         # self.criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
@@ -215,18 +223,20 @@ class Classifier(pl.LightningModule):
         # )
         optimizer = optim.AdamW(
             self.model.parameters(),
-            lr=0.001,
-            weight_decay=0.05,
+            lr=self.lr,
+            weight_decay=self.weight_decay,
         )
-        # scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        #     optimizer,
-        #     T_max=self.epoch,
-        # )
-        scheduler = CosineAnnealingWithWarmUpLR(
-            optimizer,
-            T_max=self.epoch,
-            warmup_epochs=self.warump_epochs,
-        )
+        if not self.warump_epochs:
+            scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                optimizer,
+                T_max=self.epoch,
+            )
+        else:
+            scheduler = CosineAnnealingWithWarmUpLR(
+                optimizer,
+                T_max=self.epoch,
+                warmup_epochs=self.warump_epochs,
+            )
         return [optimizer], [scheduler]
 
 
