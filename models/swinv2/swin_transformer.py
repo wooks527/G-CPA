@@ -622,8 +622,7 @@ def _swin_transformer(
     **kwargs: Any,
 ) -> SwinTransformer:
     if weights is not None:
-        # _ovewrite_named_param(kwargs, "num_classes", len(weights.meta["categories"]))
-        kwargs["num_classes"] = len(weights.meta["categories"])
+        _ovewrite_named_param(kwargs, "num_classes", len(weights.meta["categories"]))
 
     model = SwinTransformer(
         patch_size=patch_size,
