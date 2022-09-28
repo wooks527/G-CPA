@@ -39,6 +39,7 @@ class Classifier(pl.LightningModule):
         lr: float = 1e-3,
         weight_decay: float = 0.05,
         weights: str = None,
+        cutmix: bool = False,
     ) -> None:
         """Initialize instance.
 
@@ -50,6 +51,7 @@ class Classifier(pl.LightningModule):
             lr: learning rate
             weight_decay: weight decay
             weights: weight of model
+            cutmix: whether apply cutmix or not
         """
         super().__init__()
         if model_name == "resnet50":
@@ -72,8 +74,10 @@ class Classifier(pl.LightningModule):
             model = swin_v2_b(
                 weights=Swin_V2_B_Weights.IMAGENET1K_V1,
                 # weights=None, # TO-DO: Parameterize weights param
-                num_classes=num_classes,
+                # num_classes=num_classes,
             )
+            num_ftrs = model.head.in_features
+            model.head = nn.Linear(num_ftrs, num_classes)
         elif "coatnet" in model_name:
             if model_name == "coatnet0":
                 num_blocks = [2, 2, 3, 5, 2]  # L
@@ -116,9 +120,9 @@ class Classifier(pl.LightningModule):
         self.warump_epochs = warmup_epochs
         self.lr = lr
         self.weight_decay = weight_decay
+        self.cutmix = cutmix
         self.model = model
         self.criterion = nn.CrossEntropyLoss()
-        # self.criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
         self.train_acc = torchmetrics.Accuracy()
         self.valid_acc = torchmetrics.Accuracy()
         self.pred_acc = torchmetrics.Accuracy()
@@ -138,6 +142,7 @@ class Classifier(pl.LightningModule):
         outputs = self.model(inputs)
         _, preds = torch.max(outputs, 1)
         loss = self.criterion(outputs, labels)
+        labels = labels.max(dim=1)[1] if self.cutmix else labels
         return {"loss": loss, "preds": preds, "labels": labels}
 
     def training_epoch_end(self, outputs: List) -> None:

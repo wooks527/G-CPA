@@ -5,10 +5,12 @@
 """
 
 from torch.utils.data import DataLoader
+from torch.utils.data.dataloader import default_collate
 from torchvision import datasets, transforms
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from modules import Classifier
+from utils.transforms import RandomCutmix
 from utils.general import init_seeds
 
 import pytorch_lightning as pl
@@ -93,6 +95,11 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help="apply swa",
     )
+    parser.add_argument(
+        "--cutmix",
+        action="store_true",
+        help="apply CutMix",
+    )
 
     return parser.parse_args()
 
@@ -132,11 +139,22 @@ if __name__ == "__main__":
         # f"{args.data}/val",
         transform=val_transforms,
     )
+
+    if args.cutmix:
+        cutmix = RandomCutmix(args.num_classes, p=1.0, alpha=1.0)
+
+        def collate_fn(batch):
+            return cutmix(*default_collate(batch))
+
+    else:
+        collate_fn = default_collate
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch,
         shuffle=True,
         num_workers=32,
+        collate_fn=collate_fn,
     )
     val_loader = DataLoader(
         val_dataset,
@@ -152,6 +170,7 @@ if __name__ == "__main__":
         lr=args.lr,
         weight_decay=args.weight_decay,
         weights=args.weights,
+        cutmix=args.cutmix,
     )
 
     tb_logger = TensorBoardLogger(save_dir=f"logs/{args.exp_name}")
