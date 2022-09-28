@@ -87,6 +87,12 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="random seed",
     )
+    parser.add_argument(
+        "--swa",
+        type=int,
+        default=1,
+        help="apply swa",
+    )
 
     return parser.parse_args()
 
@@ -170,6 +176,7 @@ if __name__ == "__main__":
         accelerator="gpu",
         logger=[tb_logger, wandb_logger],
         callbacks=[checkpoint_callback, lr_callback],
+        accumulate_grad_batches=args.swa,
         # gradient_clip_val=5.0,
     )
     trainer.fit(
