@@ -7,6 +7,7 @@
 from torch.utils.data import DataLoader
 from torch.utils.data.dataloader import default_collate
 from torchvision import datasets, transforms
+from torchvision.transforms.functional import InterpolationMode
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from modules import Classifier
@@ -110,6 +111,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="apply RandomErase",
     )
+    parser.add_argument(
+        "--interpolation",
+        type=str,
+        default="bicubic",
+        help="interpolation method",
+    )
 
     return parser.parse_args()
 
@@ -117,11 +124,12 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = parse_args()
     init_seeds(seed=args.seed)
+    interpolation = InterpolationMode(args.interpolation)
 
     train_transforms = [
-        transforms.RandAugment(),
-        # transforms.TrivialAugmentWide(),
-        transforms.RandomResizedCrop(224),
+        transforms.RandAugment(interpolation=interpolation),
+        # transforms.TrivialAugmentWide(interpolation=interpolation),
+        transforms.RandomResizedCrop(224, interpolation=interpolation),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
@@ -132,7 +140,7 @@ if __name__ == "__main__":
 
     val_transforms = transforms.Compose(
         [
-            transforms.Resize(256),
+            transforms.Resize(256, interpolation=interpolation),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
