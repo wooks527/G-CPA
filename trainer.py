@@ -10,7 +10,7 @@ from torchvision import datasets, transforms
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from modules import Classifier
-from utils.transforms import RandomCutmix
+from utils.transforms import RandomMixup, RandomCutmix
 from utils.general import init_seeds
 
 import pytorch_lightning as pl
@@ -96,9 +96,19 @@ def parse_args() -> argparse.Namespace:
         help="apply swa",
     )
     parser.add_argument(
+        "--mixup",
+        action="store_true",
+        help="apply Mixup",
+    )
+    parser.add_argument(
         "--cutmix",
         action="store_true",
         help="apply CutMix",
+    )
+    parser.add_argument(
+        "--random_erase",
+        action="store_true",
+        help="apply RandomErase",
     )
 
     return parser.parse_args()
@@ -108,43 +118,48 @@ if __name__ == "__main__":
     args = parse_args()
     init_seeds(seed=args.seed)
 
-    train_transforms = transforms.Compose(
-        [
-            transforms.RandAugment(),
-            transforms.RandomResizedCrop(224),
-            # transforms.RandomResizedCrop(640),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        ]
-    )
+    train_transforms = [
+        transforms.RandAugment(),
+        # transforms.TrivialAugmentWide(),
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ]
+    if args.random_erase:
+        train_transforms.append(transforms.RandomErasing(p=0.25))
+    train_transforms = transforms.Compose(train_transforms)
+
     val_transforms = transforms.Compose(
         [
             transforms.Resize(256),
             transforms.CenterCrop(224),
-            # transforms.Resize(672),
-            # transforms.CenterCrop(640),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ]
     )
+
     train_dataset = datasets.ImageFolder(
         f"{args.data}/train",
-        # f"{args.data}/imagenet_c10",
-        # f"{args.data}/train_with_imgc10",
         transform=train_transforms,
     )
     val_dataset = datasets.ImageFolder(
         f"{args.data}/val_nui",
-        # f"{args.data}/val",
         transform=val_transforms,
     )
 
+    mix_transforms = []
+    if args.mixup:
+        mixup = RandomMixup(args.num_classes, p=1.0, alpha=0.8)
+        mix_transforms.append(mixup)
     if args.cutmix:
         cutmix = RandomCutmix(args.num_classes, p=1.0, alpha=1.0)
+        mix_transforms.append(cutmix)
+    if mix_transforms:
+        mixupcutmix = transforms.RandomChoice(mix_transforms)
 
         def collate_fn(batch):
-            return cutmix(*default_collate(batch))
+            return mixupcutmix(*default_collate(batch))
 
     else:
         collate_fn = default_collate
