@@ -30,6 +30,7 @@ If you want to see more details of the challenge, please check the official chal
     ```
 
 - Install packages.
+
     ```
     conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch -y
     pip -r install requirements.txt
@@ -37,12 +38,42 @@ If you want to see more details of the challenge, please check the official chal
     pre-commit install
     ```
 
+- Copy files related SwinTransformer V2 model.
+
+    ```
+    cp models/swinv2/* ~/anaconda3/env/ood-cv-cls/lib/python3.8/site-packages/torchvision/models
+    ```
+
+- Download datasets.
+
+    ```
+    cd ~/data
+
+    # phase-1
+    gdown 1bdBmI3_ZwDuIIipHq8xI5ZpYRhsWMQka
+    unzip ROBINv1.1-cls-pose.zip
+    mv ROBINv1.1-cls-pose ood-cv-cls
+    cd ood-cv-cls
+    mkdir val
+    cp -r nuisances/*/Images val/
+    cd ../
+
+
+    gdown 1xOxlrTjQb4V2uZFrp1LUdJniUI_ut_gB # phase-2
+    unzip OOD-CV-phase2.zip -d ood-cv-phase2
+    ```
+
 ### Training and Validation
 
 ```
 python trainer.py --data $DATA_DIR \
-                  --batch 128 --epoch 30 \
-                  --name resnet50-e50
+                  --model swin_v2_b --num_classes $NUM_CLASSES \
+                  --batch $BATCH_SIZE --epoch $EPOCH \
+                  --warmup_epochs $WARMUP_EPOCHS \
+                  --lr $LEARNING_RATE \
+                  --weight_decay $WEIGHT_DECAY \
+                  --exp_name $EXP_NAME \
+                  --seed $SEED
 ```
 
 ### Prediction
@@ -50,22 +81,25 @@ python trainer.py --data $DATA_DIR \
 #### Prediction Only
 ```
 python predict.py --data $DATA_DIR \
-                  --batch 128 \
+                  --batch $BATCH_SIZE \
                   --ckpt $WEIGHT_PATH \
-                  --exp_name resnet50-e50 \
-                  --test_data iid
+                  --exp_name $EXP_NAME \
+                  --test_data $TEST_TYPE
 ```
 
 #### Prediction with Submission `.csv` File
 
+##### Phase-1
+
 ```
-bash predict.sh 256 \
+bash predict.sh $DATA_DIR
+                $BATCH_SIZE \
                 $WEIGHT_PATH \
-                resnet50-e50 \
-                first_submit.zip
+                $EXP_NAME \
+                $OUTZIP_FNAME
 ```
 
 ## Contributors
 
 - Hyunwook Kim
-- ...
+- Sungmin Park

@@ -6,3 +6,4 @@ black
 pre-commit
 einops
 wandb
+gdown

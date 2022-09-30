@@ -88,6 +88,7 @@ if __name__ == "__main__":
         test_dataset,
         batch_size=args.batch,
         shuffle=False,
+        num_workers=12,
     )
 
     model = Classifier.load_from_checkpoint(args.ckpt)

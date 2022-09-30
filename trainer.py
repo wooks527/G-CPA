@@ -148,11 +148,11 @@ if __name__ == "__main__":
     )
 
     train_dataset = datasets.ImageFolder(
-        f"{args.data}/train",
+        f"{args.data}/train/Images",
         transform=train_transforms,
     )
     val_dataset = datasets.ImageFolder(
-        f"{args.data}/val_nui",
+        f"{args.data}/val/Images",
         transform=val_transforms,
     )
 
@@ -176,13 +176,13 @@ if __name__ == "__main__":
         train_dataset,
         batch_size=args.batch,
         shuffle=True,
-        num_workers=32,
+        num_workers=12,
         collate_fn=collate_fn,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=args.batch,
-        num_workers=32,
+        num_workers=12,
     )
 
     model = Classifier(
@@ -212,8 +212,7 @@ if __name__ == "__main__":
     lr_callback = LearningRateMonitor(logging_interval="epoch")
     trainer = pl.Trainer(
         max_epochs=args.epoch,
-        # devices=2,
-        devices=[0, 1, 3, 4, 5, 6, 7],
+        devices=2,
         strategy="ddp",
         accelerator="gpu",
         logger=[tb_logger, wandb_logger],

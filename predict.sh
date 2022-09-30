@@ -1,40 +1,41 @@
 #! /bin/bash
-batch=$1
-ckpt=$2
-exp_name=$3
-out_path=$4
+data=$1
+batch=$2
+ckpt=$3
+exp_name=$4
+out_path=$5
 
-python predict.py --data /data1/hyunwook/data/ood-cv-cls/iid_test/ \
+python predict.py --data $data/iid_test/Images \
                   --batch $batch \
                   --ckpt $ckpt \
                   --exp_name $exp_name --test_data iid
 
-python predict.py --data /data1/hyunwook/data/ood-cv-cls/context/ \
-                  --batch $batch \
-                  --ckpt $ckpt \
-                  --exp_name $exp_name --test_data context
-
-python predict.py --data /data1/hyunwook/data/ood-cv-cls/occlusion/ \
-                  --batch $batch \
-                  --ckpt $ckpt \
-                  --exp_name $exp_name --test_data occlusion
-
-python predict.py --data /data1/hyunwook/data/ood-cv-cls/pose/ \
-                  --batch $batch \
-                  --ckpt $ckpt \
-                  --exp_name $exp_name --test_data pose
-
-python predict.py --data /data1/hyunwook/data/ood-cv-cls/shape/ \
+python predict.py --data $data/nuisances/shape/Images \
                   --batch $batch \
                   --ckpt $ckpt \
                   --exp_name $exp_name --test_data shape
 
-python predict.py --data /data1/hyunwook/data/ood-cv-cls/texture/ \
+python predict.py --data $data/nuisances/pose/Images \
+                  --batch $batch \
+                  --ckpt $ckpt \
+                  --exp_name $exp_name --test_data pose
+
+python predict.py --data $data/nuisances/context/Images \
+                  --batch $batch \
+                  --ckpt $ckpt \
+                  --exp_name $exp_name --test_data context
+
+python predict.py --data $data/nuisances/texture/Images \
                   --batch $batch \
                   --ckpt $ckpt \
                   --exp_name $exp_name --test_data texture
 
-python predict.py --data /data1/hyunwook/data/ood-cv-cls/weather/ \
+python predict.py --data $data/nuisances/occlusion/Images \
+                  --batch $batch \
+                  --ckpt $ckpt \
+                  --exp_name $exp_name --test_data occlusion
+
+python predict.py --data $data/nuisances/weather/Images \
                   --batch $batch \
                   --ckpt $ckpt \
                   --exp_name $exp_name --test_data weather
