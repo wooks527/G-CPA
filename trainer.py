@@ -114,7 +114,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--interpolation",
         type=str,
-        default="bicubic",
+        default="bilinear",
         help="interpolation method",
     )
     parser.add_argument(
@@ -131,10 +131,13 @@ if __name__ == "__main__":
     args = parse_args()
     init_seeds(seed=args.seed)
     interpolation = InterpolationMode(args.interpolation)
+    ra_interpolation = interpolation
+    if args.interpolation == "bilinear":
+        ra_interpolation = InterpolationMode("nearest")
 
     train_transforms = [
-        transforms.RandAugment(interpolation=interpolation),
-        # transforms.TrivialAugmentWide(interpolation=interpolation),
+        transforms.RandAugment(interpolation=ra_interpolation),
+        # transforms.TrivialAugmentWide(interpolation=ra_interpolation),
         transforms.RandomResizedCrop(224, interpolation=interpolation),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
