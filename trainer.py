@@ -117,6 +117,12 @@ def parse_args() -> argparse.Namespace:
         default="bicubic",
         help="interpolation method",
     )
+    parser.add_argument(
+        "--gradient_clip",
+        type=float,
+        default="0.0",
+        help="gradient clipping",
+    )
 
     return parser.parse_args()
 
@@ -218,7 +224,7 @@ if __name__ == "__main__":
         logger=[tb_logger, wandb_logger],
         callbacks=[checkpoint_callback, lr_callback],
         accumulate_grad_batches=args.swa,
-        # gradient_clip_val=5.0,
+        gradient_clip_val=args.gradient_clip,
     )
     trainer.fit(
         model=model,
