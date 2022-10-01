@@ -50,6 +50,11 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="test dataset",
     )
+    parser.add_argument(
+        "--with_probs",
+        action="store_true",
+        help="save probabilities",
+    )
 
     return parser.parse_args()
 
@@ -110,13 +115,21 @@ if __name__ == "__main__":
         classes = sorted(set(sample_df["pred"]))
 
     idx_to_cls = {idx: cls_name for idx, cls_name in enumerate(classes)}
-    preds_list = torch.cat([result["preds"] for result in results]).tolist()
-    preds_list = [idx_to_cls[pred] for pred in preds_list]
-    results_dict = {img: pred for img, pred in zip(imgs, preds_list)}
+    preds = torch.cat([result["preds"] for result in results]).tolist()
+    preds = [idx_to_cls[pred] for pred in preds]
+    probs = torch.cat([result["probs"] for result in results]).tolist()
+    results_dict = {}
+    for img, pred, prob in zip(imgs, preds, probs):
+        results_dict[img] = (pred, round(prob, 4))
 
     df_preds = pd.read_csv(f"csvs/{args.test_data}.csv")
+    if args.with_probs:
+        df_preds = df_preds.assign(prob=0.0)
     for idx, row in df_preds.iterrows():
-        df_preds.iloc[idx]["pred"] = results_dict[row["imgs"]]
+        pred, prob = results_dict[row["imgs"]]
+        df_preds.loc[idx, "pred"] = pred
+        if args.with_probs:
+            df_preds.loc[idx, "prob"] = prob
     df_preds.to_csv(
         f"results/{args.exp_name}/{args.test_data}.csv",
         index=False,

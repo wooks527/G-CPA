@@ -197,8 +197,8 @@ class Classifier(pl.LightningModule):
 
     def predict_step(self, batch, batch_idx):
         inputs, labels = batch
-        outputs = self.model(inputs)
-        _, preds = torch.max(outputs, 1)
+        outputs = torch.sigmoid(self.model(inputs))
+        probs, preds = torch.max(outputs, 1)
         while "swin" in self.model_name and preds.max() >= self.cls_nums:
             max_pred = preds.max()
             idxs = (preds == max_pred).nonzero().flatten()
@@ -206,7 +206,7 @@ class Classifier(pl.LightningModule):
                 outputs[idx][max_pred] = 0
                 preds[idx] = torch.argmax(outputs[idx])
 
-        return {"preds": preds, "labels": labels}
+        return {"preds": preds, "labels": labels, "probs": probs}
 
     def on_predict_epoch_end(self, results: List) -> None:
         """Called at the end of the prediction epoch with the results.
