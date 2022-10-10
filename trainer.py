@@ -10,7 +10,7 @@ from torchvision import datasets, transforms
 from torchvision.transforms.functional import InterpolationMode
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
-from modules import Classifier
+from modules import Classifier, OccludedDataset
 from utils.transforms import RandomMixup, RandomCutmix
 from utils.general import init_seeds
 
@@ -29,6 +29,11 @@ def parse_args() -> argparse.Namespace:
         "--data",
         type=str,
         help="dataset directory",
+    )
+    parser.add_argument(
+        "--train_data",
+        type=str,
+        help="train dataset directory",
     )
     parser.add_argument(
         "--model",
@@ -123,6 +128,18 @@ def parse_args() -> argparse.Namespace:
         default="0.0",
         help="gradient clipping",
     )
+    parser.add_argument(
+        "--occ_data",
+        type=str,
+        default=None,
+        help="occlusion data directory path",
+    )
+    parser.add_argument(
+        "--occ_ratio",
+        type=float,
+        default="0.0",
+        help="occlusion ratio",
+    )
 
     return parser.parse_args()
 
@@ -156,10 +173,18 @@ if __name__ == "__main__":
         ]
     )
 
-    train_dataset = datasets.ImageFolder(
-        f"{args.data}/train/Images",
-        transform=train_transforms,
-    )
+    if not args.occ_data:
+        train_dataset = datasets.ImageFolder(
+            f"{args.train_data}",
+            transform=train_transforms,
+        )
+    else:
+        train_dataset = OccludedDataset(
+            f"{args.train_data}",
+            transform=train_transforms,
+            occ_data=args.occ_data,
+            occ_ratio=args.occ_ratio,
+        )
     val_dataset = datasets.ImageFolder(
         f"{args.data}/val/Images",
         transform=val_transforms,

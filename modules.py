@@ -22,9 +22,12 @@ from PIL import Image
 import pytorch_lightning as pl
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
 import torch
 import torchmetrics
 import os
+import cv2
+import random
 
 
 class Classifier(pl.LightningModule):
@@ -422,3 +425,133 @@ class ImageDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         return image, 0
+
+
+def pil_loader(path: str) -> Image.Image:
+    # open path as file to avoid ResourceWarning
+    # (https://github.com/python-pillow/Pillow/issues/835)
+    with open(path, "rb") as f:
+        img = Image.open(f)
+        return img.convert("RGB")
+
+
+IMG_EXTENSIONS = (
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".ppm",
+    ".bmp",
+    ".pgm",
+    ".tif",
+    ".tiff",
+    ".webp",
+)
+
+
+# TODO: specify the return type
+def accimage_loader(path: str) -> Any:
+    import accimage
+
+    try:
+        return accimage.Image(path)
+    except OSError:
+        # Potentially a decoding problem, fall back to PIL.Image
+        return pil_loader(path)
+
+
+def default_loader(path: str) -> Any:
+    from torchvision import get_image_backend
+
+    if get_image_backend() == "accimage":
+        return accimage_loader(path)
+    else:
+        return pil_loader(path)
+
+
+class OccludedDataset(ImageFolder):
+    def __init__(
+        self,
+        root: str,
+        transform: Optional[Callable] = None,
+        target_transform: Optional[Callable] = None,
+        loader: Callable[[str], Any] = default_loader,
+        is_valid_file: Optional[Callable[[str], bool]] = None,
+        occ_data: str = None,
+        occ_ratio: float = 0.0,
+    ):
+        super().__init__(
+            root,
+            transform=transform,
+            target_transform=target_transform,
+            loader=loader,
+            is_valid_file=is_valid_file,
+        )
+        self.imgs = self.samples
+        self.occ_data = occ_data
+        self.occ_ratio = occ_ratio
+        if self.occ_data:
+            self.occ_masks = sorted(glob(f"{self.occ_data}/**/*.npz"))
+            self.occ_imgs = []
+            for p in self.occ_masks:
+                self.occ_imgs.append(p.replace(".npz", ".JPEG"))
+
+    def get_mixed_img(self, sample, img_path, mask_path, p):
+        img = cv2.imread(img_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        mask = np.load(mask_path)
+        mask = list(mask.values())[0]
+        occ_obj = img * mask
+
+        gray_img = cv2.cvtColor(occ_obj.astype(np.uint8), cv2.COLOR_RGB2GRAY)
+        contours, _ = cv2.findContours(
+            gray_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_KCOS
+        )
+        x, y, w, h = cv2.boundingRect(contours[0])
+        rect = occ_obj[y : y + h, x : x + w]
+
+        new_img = np.array(sample)
+        if new_img.shape[0] > new_img.shape[1]:
+            x, w = new_img.shape[1] // 4, new_img.shape[1] // 2
+            y, h = new_img.shape[0] // 4, new_img.shape[0] // 2
+        else:
+            x, w = new_img.shape[1] // 4, new_img.shape[1] // 2
+            y, h = new_img.shape[0] // 4, new_img.shape[0] // 2
+
+        rect_resized = cv2.resize(rect, (w, h))
+        for r_idx, rows in enumerate(new_img[y : y + h, x : x + w, :]):
+            for c_idx, cols in enumerate(rows):
+                for d_idx, d in enumerate(cols):
+                    if rect_resized[r_idx, c_idx, d_idx] == 0:
+                        rect_resized[r_idx, c_idx, d_idx] = new_img[
+                            y + r_idx, x + c_idx, d_idx
+                        ]
+
+        new_img[y : (y + h), x : (x + w), :] = rect_resized
+        new_img = Image.fromarray(new_img)
+        # new_img.save(f"./preprocess/old/test/{os.path.basename(p)}")
+        return new_img
+
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            tuple: (sample, target)
+                   where target is class_index of the target class.
+        """
+        path, target = self.samples[index]
+        sample = self.loader(path)
+        if self.occ_data and random.random() <= self.occ_ratio:
+            occ_idx = random.randint(0, len(self.occ_imgs) - 1)
+            img_path = self.occ_imgs[occ_idx]
+            mask_path = self.occ_masks[occ_idx]
+            sample = self.get_mixed_img(sample, img_path, mask_path, path)
+        # else:
+        #     sample.save(f"./preprocess/old/test/{os.path.basename(path)}")
+        if self.transform is not None:
+            sample = self.transform(sample)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return sample, target
